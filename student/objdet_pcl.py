@@ -65,14 +65,34 @@ def show_range_image(frame, lidar_name):
         ri = np.array(ri.data).reshape(ri.shape.dims)
     
     ri_range = ri[:,:,0]
-    ri_intensity = ri[:,:,1]
-
     ri_range[ri_range<0] = 0.0
-    ri_intensity[ri_intensity<0] = 0.0
     ri_range = ((ri_range *255 ) / (np.amax(ri_range) - np.amin(ri_range)))
-    ri_intensity = np.percentile(ri_intensity,99)/2 *((ri_intensity*255) /(np.percentile(ri_intensity,99) -            np.percentile(ri_intensity,1)))
-    
-    img_range_intensity = np.vstack([ri_range, ri_intensity])    
+    ri_range = ri_range.astype(np.uint8)
+   
+
+    ri_intensity = ri[:,:,1]
+    ri_intensity[ri_intensity<0] = 0.0
+    # ri_intensity = np.percentile(ri_intensity,99)/2 *((ri_intensity*255) /(np.percentile(ri_intensity,99) - np.percentile(ri_intensity,1)))
+    ri_intensity = (ri_intensity*255) /(np.percentile(ri_intensity,99) - np.percentile(ri_intensity,1))
+    ri_intensity = ri_intensity.astype(np.uint8)
+
+    #cropping range +/-90
+    deg45_ri_range = int(ri_range.shape[1]/8)
+    ri_center_range = int(ri_range.shape[1]/2)
+    center_image_range = ri_range[:,ri_center_range - deg45_ri_range:ri_center_range+deg45_ri_range]
+
+    #cropping intensity +/-90
+    deg45_ri_intensity = int(ri_intensity.shape[1]/8)
+    ri_center_intensity = int(ri_intensity.shape[1]/2)
+    center_image_intensity = ri_intensity[:,ri_center_intensity-deg45_ri_intensity:ri_center_intensity+deg45_ri_intensity]
+
+    ''' 
+    cv2.imshow('image_intensity', ri_intensity)
+    cv2.imshow('Centre',center_image)
+    if cv2.waitKey(0) & 0xff == 27:
+        cv2.destroyAllWindows()
+    '''
+    img_range_intensity = np.vstack([center_image_range,center_image_intensity]) 
     
     return img_range_intensity
 

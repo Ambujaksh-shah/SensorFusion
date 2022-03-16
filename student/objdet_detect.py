@@ -29,6 +29,71 @@ from tools.objdet_models.resnet.utils.evaluation_utils import decode, post_proce
 from tools.objdet_models.darknet.models.darknet2pytorch import Darknet as darknet
 from tools.objdet_models.darknet.utils.evaluation_utils import post_processing_v2
 
+import argparse
+import math
+def parse_test_configs(configs):
+    parser = argparse.ArgumentParser(description='Testing config for the Implementation')
+    parser.add_argument('--saved_fn', type=str, default='fpn_resnet_18', metavar='FN',
+                        help='The name using for saving logs, models,...')
+    parser.add_argument('-a', '--arch', type=str, default='fpn_resnet_18', metavar='ARCH',
+                        help='The name of the model architecture')
+    parser.add_argument('--pretrained_path', type=str,
+                        default='../checkpoints/fpn_resnet_18/fpn_resnet_18_epoch_300.pth', metavar='PATH',
+                        help='the path of the pretrained checkpoint')
+    parser.add_argument('--K', type=int, default=50,
+                        help='the number of top K')
+    parser.add_argument('--no_cuda', action='store_true',
+                        help='If true, cuda is not used.')
+    parser.add_argument('--gpu_idx', default=0, type=int,
+                        help='GPU index to use.')
+    parser.add_argument('--num_samples', type=int, default=None,
+                        help='Take a subset of the dataset to run and debug')
+    parser.add_argument('--num_workers', type=int, default=1,
+                        help='Number of threads for loading data')
+    parser.add_argument('--batch_size', type=int, default=1,
+                        help='mini-batch size (default: 4)')
+    parser.add_argument('--peak_thresh', type=float, default=0.2)
+    parser.add_argument('--save_test_output', action='store_true',
+                        help='If true, the output image of the testing phase will be saved')
+    parser.add_argument('--output_format', type=str, default='image', metavar='PATH',
+                        help='the type of the test output (support image or video)')
+    parser.add_argument('--output_video_fn', type=str, default='out_fpn_resnet_18', metavar='PATH',
+                        help='the video filename if the output format is video')
+    parser.add_argument('--output-width', type=int, default=608,
+                        help='the width of showing output, the height maybe vary')
+
+    configs.pin_memory = True
+    configs.distributed = False  # For testing on 1 GPU only
+
+    configs.input_size = (608, 608)
+    configs.hm_size = (152, 152)
+    configs.down_ratio = 4
+    configs.max_objects = 50
+
+    configs.imagenet_pretrained = False
+    configs.head_conv = 64
+    configs.num_classes = 3
+    configs.num_center_offset = 2
+    configs.num_z = 1
+    configs.num_dim = 3
+    configs.num_direction = 2  # sin, cos
+
+    configs.heads = {
+        'hm_cen': configs.num_classes,
+        'cen_offset': configs.num_center_offset,
+        'direction': configs.num_direction,
+        'z_coor': configs.num_z,
+        'dim': configs.num_dim
+    }
+    configs.num_input_features = 4
+
+    configs.arch = 'fpn_resnet'
+    configs.K = 50
+    configs.conf_thresh = 0.5
+    configs.min_iou = 0.5 
+
+    return configs
+
 
 # load model-related parameters into an edict
 def load_configs_model(model_name='darknet', configs=None):
@@ -60,46 +125,10 @@ def load_configs_model(model_name='darknet', configs=None):
     elif model_name == 'fpn_resnet':
                ####### ID_S3_EX1-3 START #######     
         #######
+	configs = parse_test_configs(configs)
         configs.model_path = os.path.join(parent_path, 'tools', 'objdet_models', 'resnet')
         configs.pretrained_filename = os.path.join(configs.model_path, 'pretrained', 'fpn_resnet_18_epoch_300.pth')
-        configs.saved_fn ='fpn_resnet_18'
-        configs.arch = 'fpn_resnet_18'
-        configs.arch_='fpn_resnet'
-        configs.batch_size = 1
-        configs.conf_thresh = 0.5
-        configs.distributed = False
-        configs.img_size = 608
-        configs.nms_thresh = 0.4
-        configs.num_samples = None
-        configs.num_workers = 1
-        configs.use_giou_loss = False
-        configs.save_test_output = False
-        configs.output_format = 'image'
-        configs.output_video_fn = 'out_fpn_resnet'
-
-        configs.pin_memory = True
-        configs.distributed = False  # For testing on 1 GPU only
-        configs.input_size = (608, 608)
-        configs.hm_size = (152, 152)
-        configs.K = 50
-        configs.peak_thresh = 0.2
-        configs.down_ratio = 4
-        configs.max_objects = 50
-        configs.imagenet_pretrained = False
-        configs.head_conv = 64
-        configs.num_classes = 3
-        configs.num_center_offset = 2
-        configs.num_z = 1
-        configs.num_dim = 3
-        configs.num_direction = 2  # sin, cos
-        configs.heads = {
-            'hm_cen': configs.num_classes,
-            'cen_offset': configs.num_center_offset,
-            'direction': configs.num_direction,
-            'z_coor': configs.num_z,
-            'dim': configs.num_dim
-        }
-        configs.num_input_features = 4
+        
         #######
         ####### ID_S3_EX1-3 END #######     
 
@@ -151,12 +180,7 @@ def create_model(configs):
         model = darknet(cfgfile=configs.cfgfile, use_giou_loss=configs.use_giou_loss)    
     
     elif 'fpn_resnet' in configs.arch:
-         try:
-            arch_parts = configs.arch.split('_')
-            num_layers = int(arch_parts[-1])
-        except:
-            raise ValueError   
-        print('using ResNet architecture with feature pyramid')
+        num_layers =18
         model = fpn_resnet.get_pose_net(num_layers=num_layers, heads=configs.heads, head_conv=configs.head_conv,imagenet_pretrained=configs.imagenet_pretrained)
     
     
